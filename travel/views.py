@@ -7,6 +7,10 @@ from .models import Destination, FoodPlace
 from django.contrib.auth.models import User
 from .models import UserProfile
 from .serializers import DestinationSerializer, FoodPlaceSerializer, UserProfileSerializer
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import api_view, permission_classes
+
+
 
 @api_view(['GET'])
 def destinations_list(request):
@@ -105,4 +109,69 @@ def personalized_recommendation(request, user_id):
         "personalized_recommendations": serializer.data
     })
     
+
+#Add Permissions Protect your API's 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def destinations_list(request):
+    destinations = Destination.objects.all()
+    serializer = DestinationSerializer(destinations, many=True)
+    return Response(serializer.data)
+
+
+# Protect adding destinations
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def add_destination(request):
+    serializer = DestinationSerializer(data=request.data)
+    if serializer.is_vaild():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# Protect personalized recommendations
+@api_view(["GET"])
+@permission_classes(["IsAuthenticated"])
+def personalized_recommendations(request, user_id):
+    profile = get_object_or_404(UserProfile, user_id=user_id)
+
+    food_places = FoodPlace.objects.all()
+    if profile.favorite_cuisine:
+        food_places = food_places.filter(cuisine_icontains=profile.favorite_cuisine)
+
+    if profile.preferred_country:
+        food_places = food_places.filter(destination_country_icontains = profile.preferred_country)
+
+
+    serializer = FoodPlaceSerializer(food_places, many=True)
+    return Response({
+        "user": profile.user.username,
+        "preferences":{""
+        "favorite_cuisine": profile.favorite_cuisine,
+        "prefered_country": profile.preferred_country,},
+        "personalized_recommendations": serializer.data
+    })
+
+# Only Logged In user can add destinations
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def add_destination(request):
+    serializer = DestinationSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def add_food_place(request):
+    serializer = FoodPlaceSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_400_BAD_REQUEST)
+    
+
+    
+
+
 # Create your views here.
